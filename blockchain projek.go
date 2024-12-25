@@ -1,3 +1,4 @@
+// Kode perubahan 
 package main
 
 import (
@@ -6,26 +7,30 @@ import (
 	"log"
 	"net/http"
 	"sync"
+
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
 
-var upgrader = websocket.Upgrader{} // WebSocket upgrader
+var upgrader = websocket.Upgrader{}
 var clients = make(map[*websocket.Conn]bool)
 var broadcast = make(chan interface{})
 var mutex = &sync.Mutex{}
 
+// SmartContract represents the chaincode
 type SmartContract struct {
 	contractapi.Contract
 }
 
+// Student represents a student object
 type Student struct {
 	Name   string `json:"name"`
 	School string `json:"school"`
 	Status string `json:"status"`
 }
 
+// Transaction represents a transaction log
 type Transaction struct {
 	ID         string `json:"id"`
 	Action     string `json:"action"`
@@ -33,8 +38,20 @@ type Transaction struct {
 	Timestamp  string `json:"timestamp"`
 }
 
-// Fungsi untuk registrasi siswa
+// RegisterStudent adds a new student to the ledger
 func (s *SmartContract) RegisterStudent(ctx contractapi.TransactionContextInterface, id string, name string, school string) error {
+	if id == "" || name == "" || school == "" {
+		return fmt.Errorf("ID, name, and school cannot be empty")
+	}
+
+	existing, err := ctx.GetStub().GetState(id)
+	if err != nil {
+		return fmt.Errorf("failed to read ledger: %v", err)
+	}
+	if existing != nil {
+		return fmt.Errorf("student with ID %s already exists", id)
+	}
+
 	student := Student{
 		Name:   name,
 		School: school,
@@ -43,15 +60,14 @@ func (s *SmartContract) RegisterStudent(ctx contractapi.TransactionContextInterf
 
 	studentAsBytes, err := json.Marshal(student)
 	if err != nil {
-		return fmt.Errorf("gagal melakukan serialisasi data mahasiswa: %v", err)
+		return fmt.Errorf("failed to serialize student: %v", err)
 	}
 
 	err = ctx.GetStub().PutState(id, studentAsBytes)
 	if err != nil {
-		return fmt.Errorf("gagal menyimpan data siswa dengan ID %s: %v", id, err)
+		return fmt.Errorf("failed to write student to ledger: %v", err)
 	}
 
-	// Tambahkan transaksi ke audit log
 	transaction := Transaction{
 		ID:        "tx_" + id,
 		Action:    "Register",
@@ -60,44 +76,42 @@ func (s *SmartContract) RegisterStudent(ctx contractapi.TransactionContextInterf
 	}
 	logTransaction(transaction)
 
-	// Kirim notifikasi melalui WebSocket
 	broadcast <- transaction
 
 	return nil
 }
 
-// Fungsi untuk query siswa
+// QueryStudent retrieves a student by ID
 func (s *SmartContract) QueryStudent(ctx contractapi.TransactionContextInterface, id string) (*Student, error) {
 	studentAsBytes, err := ctx.GetStub().GetState(id)
 	if err != nil {
-		return nil, fmt.Errorf("gagal mengambil data mahasiswa dengan ID %s: %v", id, err)
+		return nil, fmt.Errorf("failed to read student data: %v", err)
 	}
 
 	if studentAsBytes == nil {
-		return nil, fmt.Errorf("mahasiswa dengan ID %s tidak ditemukan", id)
+		return nil, fmt.Errorf("student with ID %s not found", id)
 	}
 
 	student := new(Student)
 	err = json.Unmarshal(studentAsBytes, student)
 	if err != nil {
-		return nil, fmt.Errorf("gagal melakukan deserialisasi data mahasiswa dengan ID %s: %v", id, err)
+		return nil, fmt.Errorf("failed to deserialize student data: %v", err)
 	}
 
 	return student, nil
 }
 
-// Fungsi untuk audit log
+// logTransaction logs a transaction
 func logTransaction(transaction Transaction) {
-	// Simpan log transaksi di blockchain atau database eksternal
 	fmt.Printf("Transaction Logged: %+v\n", transaction)
 }
 
 // WebSocket handler
 func handleConnections(w http.ResponseWriter, r *http.Request) {
-	// Upgrade HTTP ke WebSocket
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("Failed to upgrade connection: %v", err)
+		return
 	}
 	defer ws.Close()
 
@@ -105,7 +119,6 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	clients[ws] = true
 	mutex.Unlock()
 
-	// Kirim update real-time jika ada data baru
 	for {
 		message, ok := <-broadcast
 		if !ok {
@@ -122,41 +135,34 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Rest API handler untuk verifikasi siswa berdasarkan status
+// REST API handlers
+func registerStudentHandler(w http.ResponseWriter, r *http.Request) {
+	// Placeholder for handling POST request
+	http.Error(w, "Not implemented", http.StatusNotImplemented)
+}
+
+func queryStudentHandler(w http.ResponseWriter, r *http.Request) {
+	// Placeholder for handling GET request
+	http.Error(w, "Not implemented", http.StatusNotImplemented)
+}
+
 func verifyStudentsHandler(w http.ResponseWriter, r *http.Request) {
-	status := r.URL.Query().Get("status")
-	if status == "" {
-		http.Error(w, "Status query parameter required", http.StatusBadRequest)
-		return
-	}
-
-	// Ambil daftar siswa berdasarkan status (hanya contoh, ambil dari ledger)
-	// Misalnya: Semua siswa dengan status "Registered"
-	verifiedStudents := []Student{
-		{Name: "Alice", School: "School A", Status: "Registered"},
-		{Name: "Bob", School: "School B", Status: "Registered"},
-	}
-
-	json.NewEncoder(w).Encode(verifiedStudents)
+	// Placeholder for query verification
+	http.Error(w, "Not implemented", http.StatusNotImplemented)
 }
 
 func main() {
 	router := mux.NewRouter()
 
-	// Route untuk API
 	router.HandleFunc("/api/register-student", registerStudentHandler).Methods("POST")
 	router.HandleFunc("/api/query-student/{id}", queryStudentHandler).Methods("GET")
 	router.HandleFunc("/api/verify-students", verifyStudentsHandler).Methods("GET")
-
-	// WebSocket route
 	router.HandleFunc("/ws", handleConnections)
 
-	// Mulai server HTTP
 	go func() {
 		log.Fatal(http.ListenAndServe(":8000", router))
 	}()
 
-	// Kirimkan pesan broadcast ketika ada perubahan
 	for {
 		msg := <-broadcast
 		for client := range clients {
