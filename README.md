@@ -1,5 +1,5 @@
 # DecentraSend 😊 
-- Decentrasend is a secure data transmission platform. It uses blockchain technology as data encryption. 🗿 
+- Decentrasend is a secure data transmission platform. It uses blockchain technology as data encryption. 
 
 ## Features 👀
 - Secure login system 🔒
