@@ -10,4 +10,7 @@
 ## How to Use 👀
 - Clone this repository
   ```bash
-  git clone https://github.com/Centro-bot/Simple-Blockchain-In-SMAN-33.git
+  git clone https://github.com/Centro-bot/DecentraSend.git
+- Change your directory
+  ```bash
+  cd DecentraSend
