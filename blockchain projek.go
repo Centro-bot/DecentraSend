@@ -1,4 +1,3 @@
-// Kode perubahan 
 package main
 
 import (
@@ -7,16 +6,21 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/websocket"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
 
-var upgrader = websocket.Upgrader{}
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true // Izinkan semua origin (untuk development saja)
+	},
+}
 var clients = make(map[*websocket.Conn]bool)
 var broadcast = make(chan interface{})
-var mutex = &sync.Mutex{}
+var mutex = &sync.Mutex{};
 
 // SmartContract represents the chaincode
 type SmartContract struct {
@@ -32,10 +36,10 @@ type Student struct {
 
 // Transaction represents a transaction log
 type Transaction struct {
-	ID         string `json:"id"`
-	Action     string `json:"action"`
-	StudentID  string `json:"student_id"`
-	Timestamp  string `json:"timestamp"`
+	ID        string `json:"id"`
+	Action    string `json:"action"`
+	StudentID string `json:"student_id"`
+	Timestamp string `json:"timestamp"`
 }
 
 // RegisterStudent adds a new student to the ledger
@@ -72,7 +76,7 @@ func (s *SmartContract) RegisterStudent(ctx contractapi.TransactionContextInterf
 		ID:        "tx_" + id,
 		Action:    "Register",
 		StudentID: id,
-		Timestamp: ctx.GetStub().GetTxTimestamp().String(),
+		Timestamp: time.Now().Format(time.RFC3339),
 	}
 	logTransaction(transaction)
 
@@ -137,30 +141,64 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 // REST API handlers
 func registerStudentHandler(w http.ResponseWriter, r *http.Request) {
-	// Placeholder for handling POST request
-	http.Error(w, "Not implemented", http.StatusNotImplemented)
+	var req struct {
+		ID     string `json:"id"`
+		Name   string `json:"name"`
+		School string `json:"school"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Simulate a transaction context (replace with actual Fabric context)
+	ctx := &contractapi.TransactionContext{}
+	contract := SmartContract{}
+	if err := contract.RegisterStudent(ctx, req.ID, req.Name, req.School); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte("Student registered successfully"))
 }
 
 func queryStudentHandler(w http.ResponseWriter, r *http.Request) {
-	// Placeholder for handling GET request
-	http.Error(w, "Not implemented", http.StatusNotImplemented)
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Student ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Simulate a transaction context (replace with actual Fabric context)
+	ctx := &contractapi.TransactionContext{}
+	contract := SmartContract{}
+	student, err := contract.QueryStudent(ctx, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(student)
 }
 
 func verifyStudentsHandler(w http.ResponseWriter, r *http.Request) {
 	// Placeholder for query verification
-	http.Error(w, "Not implemented", http.StatusNotImplemented)
+	w.WriteHeader(http.StatusNotImplemented)
+	w.Write([]byte("Not implemented"))
 }
 
 func main() {
-	router := mux.NewRouter()
+	r := chi.NewRouter()
 
-	router.HandleFunc("/api/register-student", registerStudentHandler).Methods("POST")
-	router.HandleFunc("/api/query-student/{id}", queryStudentHandler).Methods("GET")
-	router.HandleFunc("/api/verify-students", verifyStudentsHandler).Methods("GET")
-	router.HandleFunc("/ws", handleConnections)
+	r.Post("/api/register-student", registerStudentHandler)
+	r.Get("/api/query-student/{id}", queryStudentHandler)
+	r.Get("/api/verify-students", verifyStudentsHandler)
+	r.Get("/ws", handleConnections)
 
 	go func() {
-		log.Fatal(http.ListenAndServe(":8000", router))
+		log.Fatal(http.ListenAndServe(":8000", r))
 	}()
 
 	for {
