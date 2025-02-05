@@ -1,8 +1,12 @@
 # DecentraSend 😊 
-- Decentrasend is a secure data transmission platform. It uses blockchain technology as data encryption. 
+- This project is a sample Go application that implements REST API and WebSocket to manage student data using blockchain. This application can also be run on Docker.
 
 ## Features 👀
-- Secure login system 🔒
+- REST API
+-- Registers new student
+-- Query student by ID
+-- Verify student data (placeholder)
+  
 - Running on a private Network (⁠•⁠‿⁠•⁠)
 - Using the latest blockchain technology
 - dst💆
